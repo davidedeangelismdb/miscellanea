@@ -1,0 +1,344 @@
+########################################################## KERBEROS CONFIGS
+
+https://gist.github.com/ashrithr/4767927948eca70845db
+
+Packages required:
+
+KDC server package: krb5-server
+Admin package: krb5-libs
+Client package: krb5-workstation
+Configuration Files:
+
+/var/kerberos/krb5kdc/kdc.conf
+/var/kerberos/krb5kdc/kadm5.acl
+/etc/krb5.conf
+Important Paths:
+
+KDC path: /var/kerberos/krb5kdc/
+
+########################################################## KERBEROS KDC KRB5 and KDC CONF FILE
+
+[vagrant@kdc ~]$ sudo cat /etc/krb5.conf
+# Configuration snippets may be placed in this directory as well
+includedir /etc/krb5.conf.d/
+
+[logging]
+ default = FILE:/var/log/krb5libs.log
+ kdc = FILE:/var/log/krb5kdc.log
+ admin_server = FILE:/var/log/kadmind.log
+
+[libdefaults]
+ dns_lookup_realm = false
+ ticket_lifetime = 24h
+ renew_lifetime = 7d
+ forwardable = true
+ proxiable = true
+ rdns = false
+ default_realm = FOOBAR.COM
+ default_ccache_name = KEYRING:persistent:%{uid}
+
+[realms]
+ FOOBAR.COM = {
+  kdc = kdc.foobar.com
+  admin_server = kdc.foobar.com
+ }
+
+[domain_realm]
+ .foobar.com = FOOBAR.COM
+ foobar.com = FOOBAR.COM
+
+##############################
+
+[vagrant@kdc ~]$ sudo cat /var/kerberos/krb5kdc/kdc.conf
+[kdcdefaults]
+ kdc_ports = 750,88
+ kdc_tcp_ports = 88
+
+[realms]
+ FOOBAR.COM = {
+  key_stash_file = /var/kerberos/krb5kdc/stash
+  database_name = /var/kerberos/krb5kdc/principal
+  kdc_ports = 750,88
+  master_key_type = des3-hmac-sha1
+  max_life = 10h 0m 0s
+  max_renewable_life = 7d 0h 0m 0s
+  acl_file = /var/kerberos/krb5kdc/kadm5.acl
+  dict_file = /usr/share/dict/words
+  admin_keytab = /var/kerberos/krb5kdc/kadm5.keytab
+  supported_enctypes = arcfour-hmac:normal des3-hmac-sha1:normal des-cbc-crc:normal des:normal des:v4 des:norealm des:onlyrealm des:afs3
+  default_principal_flags = +preauth 
+ }
+
+##############################
+
+########################################################## KERBEROS KCLIENT KRB5 and KDC CONF FILE
+
+[vagrant@kdc ~]$ sudo cat /var/kerberos/krb5kdc/kadm5.acl
+*/admin@FOOBAR.COM  *
+
+
+[vagrant@kdc-client ~]$ sudo cat /etc/krb5.conf
+# Configuration snippets may be placed in this directory as well
+includedir /etc/krb5.conf.d/
+
+[logging]
+ default = FILE:/var/log/krb5libs.log
+ kdc = FILE:/var/log/krb5kdc.log
+ admin_server = FILE:/var/log/kadmind.log
+
+[libdefaults]
+ dns_lookup_realm = false
+ ticket_lifetime = 24h
+ renew_lifetime = 7d
+ forwardable = true
+ proxiable = true
+ rdns = false
+ default_realm = FOOBAR.COM
+ default_ccache_name = KEYRING:persistent:%{uid}
+
+[realms]
+ FOOBAR.COM = {
+  kdc = kdc.foobar.com
+  admin_server = kdc.foobar.com
+ }
+
+[domain_realm]
+ .foobar.com = FOOBAR.COM
+ foobar.com = FOOBAR.COM
+
+##############################
+
+########################################################## KERBEROS INSTALLATION
+
+Vagrant(old version) network issue with centos 7
+
+    sudo nmcli connection reload
+    sudo systemctl restart network.service
+
+You do not necesseraly need a DNS server for Kerberos to work. /etc/hosts file is sufficient, but
+somewhat limited when network's size grows. Kerberos only needs proper direct- and reverseresolution
+of hostname, which should point to their respective FQDN (Fully Qualified Domain
+Name). 
+
+HOSTS
+
+    192.168.22.22 kdc.foobar.com kdc
+    192.168.22.23 kdc-client.foobar.com kdc-client
+
+SOURCE COMPILATION AND INSTALLATION
+
+SERVER
+
+Setup and install NTP
+
+    sudo yum -y install ntp
+    sudo ntpdate 0.rhel.pool.ntp.org
+    sudo systemctl start  ntpd.service
+    sudo systemctl enable ntpd.service
+
+Installing & Configuring KDC Server:
+
+    sudo yum -y install krb5-server krb5-libs
+
+    sudo vi /etc/krb5.conf
+
+    sudo vi /var/kerberos/krb5kdc/kdc.conf
+
+    sudo vi /var/kerberos/krb5kdc/kadm5.acl
+
+    */admin@FOOBAR.COM      *
+
+    sudo kdb5_util create -r FOOBAR.COM -s
+
+    sudo systemctl start krb5kdc.service
+    sudo systemctl start kadmin.service
+    sudo systemctl enable krb5kdc.service
+    sudo systemctl enable kadmin.service
+
+############################## CLIENT
+
+Setup and install NTP and KERBEROS 
+    
+    sudo yum -y install krb5-workstation
+
+    sudo yum -y install ntp
+    sudo ntpdate 0.rhel.pool.ntp.org
+    sudo systemctl start  ntpd.service
+    sudo systemctl enable ntpd.service
+
+KERBERIZE kclient.
+    ank frank@FOOBAR.COM
+    ktadd -k /tmp/krb5_frank.keytab frank@FOOBAR.COM
+
+kinit -t /etc/krb5_davide.keytab -p davide -k
+
+########################################################## KERBEROS MONGODB
+
+############################## HOSTS
+
+    192.168.22.22 kdc.foobar.com kdc
+    192.168.22.23 kdc-client.foobar.com kdc-client
+
+    192.168.22.24 opsmgr.foobar.com opsmgr
+    192.168.22.25 backup.foobar.com backup
+    192.168.22.26 agents.foobar.com agents
+    192.168.22.27 node0.foobar.com node0
+    192.168.22.28 node1.foobar.com node1
+    
+############################## MONGODB KERBERIZED
+    
+    sudo vi /etc/yum.repos.d/mongodb-enterprise.repo
+
+[mongodb-enterprise]
+name=MongoDB Enterprise Repository
+baseurl=https://repo.mongodb.com/yum/redhat/$releasever/mongodb-enterprise/3.4/$basearch/
+gpgcheck=1
+enabled=1
+gpgkey=https://www.mongodb.org/static/pgp/server-3.4.asc
+
+    sudo yum install -y mongodb-enterprise
+
+    sudo yum -y install krb5-workstation
+
+    sudo yum -y install ntp
+    sudo ntpdate 0.rhel.pool.ntp.org
+    sudo systemctl start  ntpd.service
+    sudo systemctl enable ntpd.service
+
+##############################
+
+    kadmin.local: ank -randkey mongodb/node0.foobar.com@FOOBAR.COM
+    kadmin.local: listprincs
+    kadmin.local: ktadd -k /shared/krb5_node0.keytab mongodb/node0.foobar.com
+
+    kadmin.local: ank davide@FOOBAR.COM
+    kadmin.local: listprincs
+    kadmin.local: ktadd -k /shared/krb5_davide.keytab davide@FOOBAR.COM
+
+sudo chown mongod:mongod /var/lib/mongo/krb5_node0.keytab 
+sudo chmod 400 /var/lib/mongo/krb5_node0.keytab
+
+############################## MONGODB KERBEROS CONFIG
+    
+    COPY from KDC the krb5.conf and krb5_node0.keytab, setup as env var or pass as param
+
+    export KRB5_CONFIG=/var/lib/mongo/krb5.conf
+    export KRB5_KTNAME=/var/lib/mongo/krb5_node0.keytab
+
+    setParameter:
+       authenticationMechanisms: GSSAPI
+
+############################## CONFIG MONGODB INSTANCE FOR EXTERNAL AUTH WITH KERBEROS
+
+    sudo -u mongod mongod --dbpath /var/lib/mongo/ --logpath /var/log/mongodb/mongod.log --fork
+
+    use $external
+    db.createUser(
+       {
+         user: "davide@FOOBAR.COM",
+         roles: [ { role: "root", db: "admin" } ]
+       }
+    )
+
+############################## RESTART WITH AUTH PARAM
+
+sudo -u mongod env KRB5_KTNAME=/var/lib/mongo/krb5_node0.keytab KRB5_CONFIG=/var/lib/mongo/krb5.conf mongod  --dbpath /var/lib/mongo/ --logpath /var/log/mongodb/mongod.log --setParameter authenticationMechanisms=GSSAPI --auth --fork 
+
+
+############################## MONGODB CLIENT SIDE
+
+    yum -y install krb5-workstation
+    sudo cp /var/lib/mongo/krb5.conf /etc/
+
+############################## REQUEST TGT and TGS
+
+    kinit -p davide
+
+############################## CONNECT TO MONGODBKERBERIZED
+
+    mongo --host node0.foobar.com --authenticationMechanism=GSSAPI --authenticationDatabase='$external' --username davide@FOOBAR.COM
+
+    mongo --host node0.foobar.com --port 27301 --authenticationMechanism=GSSAPI --authenticationDatabase='$external' --username frank@FOOBAR.COM
+ 
+############################## create read write user role
+
+    use $external
+    db.createUser(
+       {
+         user: "frank@FOOBAR.COM",
+         roles: [ { role: "readWrite", db: "test" } ]
+       }
+    )
+
+########################################################## KERBEROS OM CREATE on node1 a kerberized deployment with OM
+
+############################## CREATE ROLES on KDC
+
+ank -randkey automation-agent/agents.foobar.com@FOOBAR.COM
+ank -randkey backup-agent/agents.foobar.com@FOOBAR.COM
+ank -randkey monitor-agent/agents.foobar.com@FOOBAR.COM
+ank -randkey mongodb/node0.foobar.com@FOOBAR.COM
+
+[vagrant@kdc ~]$ sudo kadmin.local
+Authenticating as principal root/admin@FOOBAR.COM with password.
+kadmin.local:  listprincs
+K/M@FOOBAR.COM
+automation-agent/agents.foobar.com@FOOBAR.COM
+backup-agent/agents.foobar.com@FOOBAR.COM
+davide@FOOBAR.COM
+frank@FOOBAR.COM
+kadmin/admin@FOOBAR.COM
+kadmin/changepw@FOOBAR.COM
+kadmin/kdc.foobar.com@FOOBAR.COM
+kdc-client.foobar.com@FOOBAR.COM
+kiprop/kdc.foobar.com@FOOBAR.COM
+krbtgt/FOOBAR.COM@FOOBAR.COM
+mongodb/node0.foobar.com@FOOBAR.COM
+monitor-agent/agents.foobar.com@FOOBAR.COM
+
+############################## EXPORT KEYTAB FOR EACH AGENT PRINCIPAL
+
+ktadd -k /shared/automation_agent.keytab automation-agent/agents.foobar.com@FOOBAR.COM
+ktadd -k /shared/backup_agent.keytab backup-agent/agents.foobar.com@FOOBAR.COM
+ktadd -k /shared/monitor_agent.keytab monitor-agent/agents.foobar.com@FOOBAR.COM
+ktadd -k /shared/node0.foobar.com.keytab mongodb/node0.foobar.com@FOOBAR.COM
+
+############################## EXPORT KEYTAB and CONF FILE on the AGENT NODE
+sudo chown `whoami` /share/krbstuff
+############################## enable kerberos security on OPSMGR
+
+CREATE DEPLOY?
+3.4.3 kerberos api bug?
+
+install kerberos client for kinit
+install mongodb enterprise
+
+kinit -t /shared/automation_agent.keytab -p automation-agent/agents.foobar.com@FOOBAR.COM -k
+
+deploy
+
+add startup option kerberos
+
+start security kerberos
+
+use $external as identifier
+
+mongo --authenticationMechanism=GSSAPI --authenticationDatabase='$external' --username davide@FOOBAR.COM --host agents.foobar.com --port 27000
+
+mongo --host node1.foobar.com --port 27017 --authenticationMechanism=GSSAPI --authenticationDatabase='$external' --username admin@FOOBAR.COM
+
+
+both agents and node0
+/etc/krb5.conf
+export on node0
+veryf permission on  keytab and conf
+
+
+"credentials" : { "external" : true}
+
+  db.system.users.update(){"_id" : "external.admin@FOOBAR.COM"},{@set:{"credentials" : { "external" : true}}
+
+
+
+
+
