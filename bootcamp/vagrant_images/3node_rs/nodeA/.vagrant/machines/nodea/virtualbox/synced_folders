@@ -1,1 +1,0 @@
-{"rsync":{"/vagrant":{"type":"rsync","guestpath":"/vagrant","hostpath":"/Users/davide.deangelis/vagrant_file/3node_rs/nodeA","disabled":false,"__vagrantfile":true,"owner":"vagrant","group":"vagrant"}},"virtualbox":{"/shared":{"create":true,"guestpath":"/shared","hostpath":"/Users/davide.deangelis/vagrant_file/3node_rs/nodeA/shared","disabled":false,"__vagrantfile":true}}}
