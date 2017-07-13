@@ -1,0 +1,7 @@
+automation-agent/agents.foobar.com@FOOBAR.COM automation_agent.foobar.com.keytab
+backup-agent/agents.foobar.com@FOOBAR.COM backup_agent.foobar.com.keytab
+monitor-agent/agents.foobar.com@FOOBAR.COM monitor_agent.foobar.com.keytab
+mongodb/node0.foobar.com@FOOBAR.COM node0.foobar.com.keytab
+mongodb/node1.foobar.com@FOOBAR.COM node1.foobar.com.keytab
+mongodb/node2.foobar.com@FOOBAR.COM node2.foobar.com.keytab
+host/kdc-client.foobar.com@FOOBAR.COM kdc-client.foobar.com.keytab

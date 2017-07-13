@@ -1,0 +1,10 @@
+# awk '{ print "ank -randkey", $1 }' < /shared/princnames | time /usr/sbin/kadmin.local> /dev/null
+# The preceding example is split over two lines for readability.
+
+#The script reads in a file called princnames. This file contains principal names and their passwords, and adds them to the #Kerberos database.
+
+#You would have to create the princnames file, which contains a principal name and its password on each line, separated by #one or more spaces.
+
+#The ank command adds a new key. ank is an alias for the add_principal command.
+
+#The +needchange option configures the principal so that the user who is the principal is prompted for a new password at #first login.

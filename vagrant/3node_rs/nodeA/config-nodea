@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+set -e
+set -x
+
+
+function config_hosts(){
+  echo "configure /etc/hosts..."
+  echo "192.168.222.20 nodeb.foobar.com nodeb"   >> /etc/hosts
+  echo "192.168.222.30 nodec.foobar.com nodec"   >> /etc/hosts
+  echo "192.168.22.24 opsmgr.foobar.com opsmgr"   >> /etc/hosts
+  echo "192.168.22.26 agents.foobar.com agents"   >> /etc/hosts
+
+}
+
+function install_mongodenterprise(){
+  echo "install mongodb enterprise 3.4"
+  cp /shared/mongodb-enterprise.repo /etc/yum.repos.d/mongodb-enterprise.repo
+  yum install -y mongodb-enterprise
+}
+
+function create_db_path(){
+  mkdir -p /data/3nodes/nodea/logs
+  chown mongod:mongod -R /data
+}
+
+#config = { _id: “3nodes", members:[{ _id : 0, host : "nodea.foobar.com:27017"},{ _id : 1, host : "nodeb.foobar.com:27017"},{ _id : 2, host : "nodec.foobar.com:27017"} ]};
+#rs.initiate(config);
+#mongo.mongoUri=mongodb://nodea.foobar.com:27017,nodeb.foobar.com:27017,nodec.foobar.com:27017
+#curl -u "admin@foobar.com:240df191-6381-4c0d-88d3-9066cc8e5fc1" "http://nodea:8080/api/public/v1.0/groups/5950dcd6c23f1b15e5b9912c/automationConfig" --digest -i
+
+function createReplicaSet(){
+  sudo cp /shared/mongod.conf /data/3nodes/nodea/mongod.conf
+  sudo chown mongod:mongod /data/3nodes/nodea/mongod.conf
+  sudo chmod 400 /data/3nodes/nodea/mongod.conf
+  sudo -u mongod mongod -f /data/3nodes/nodea/mongod.conf
+}
+
+config_hosts
+install_mongodenterprise
+create_db_path
+createReplicaSet
+echo "DONE"

@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+set -e
+set -x
+
+
+function config_hosts(){
+  
+  echo "configure /etc/hosts..."
+  #KERBEROS BASIC CONFIG
+  echo "192.168.22.22 kdc.foobar.com kdc"   >> /etc/hosts
+  echo "192.168.22.23 kdc-client.foobar.com kdc-client"   >> /etc/hosts
+  #KERBEROS OM INTEGRATION CONFIG
+  echo "192.168.22.24 opsmgr.foobar.com opsmgr"   >> /etc/hosts
+  echo "192.168.22.25 backup.foobar.com backup"   >> /etc/hosts
+  echo "192.168.22.26 agents.foobar.com agents"   >> /etc/hosts
+  echo "192.168.22.27 node0.foobar.com node0"   >> /etc/hosts
+  echo "192.168.22.28 node1.foobar.com node1"   >> /etc/hosts
+  echo "192.168.22.29 node2.foobar.com node2"   >> /etc/hosts
+}
+
+function install_ntp(){
+  echo "INSTALL NTP"
+  sudo yum -y install ntp
+  sudo ntpdate 0.rhel.pool.ntp.org
+  sudo systemctl start  ntpd.service
+  sudo systemctl enable ntpd.service
+}
+
+function install_kerberos_kdc(){
+  echo "INSTALL KERBEROS"
+  # install kerberos server and libs
+  sudo yum -y install krb5-server krb5-libs
+  # copy paste the content of krb5.conf file 4 -rw-r--r--.  1 root root      583 Mar 30 15:50 krb5.conf
+  sudo cp /shared/krb5.conf /etc/krb5.conf
+  sudo chown root:root /etc/krb5.conf
+  sudo chmod 644 /etc/krb5.conf
+  # copy paste the content of kdc.conf file -rw-------. 1 root root   602 Mar 30 15:57 kdc.conf
+  sudo cp /shared/kdc.conf /var/kerberos/krb5kdc/kdc.conf
+  sudo chown root:root /var/kerberos/krb5kdc/kdc.conf
+  sudo chmod 600 /var/kerberos/krb5kdc/kdc.conf
+  # copy paste the content of kadm5.acl file -rw-------. 1 root root    21 Mar 30 16:48 kadm5.acl
+  sudo cp /shared/kadm5.acl /var/kerberos/krb5kdc/kadm5.acl
+  sudo chown root:root /var/kerberos/krb5kdc/kadm5.acl
+  sudo chmod 600 /var/kerberos/krb5kdc/kadm5.acl
+}
+
+function increase_entropy(){
+   sudo yum install wget
+   sudo wget http://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-9.noarch.rpm
+   sudo rpm -ivh epel-release-7-9.noarch.rpm
+   sudo yum install haveged
+   haveged -w 1024
+}
+
+function create_realm(){
+  # create the FOOBAR.COM REALM
+  sudo kdb5_util create -r FOOBAR.COM -s
+  # start the kdc and kadmin
+  sudo systemctl start krb5kdc.service
+  sudo systemctl start kadmin.service
+  sudo systemctl enable krb5kdc.service
+  sudo systemctl enable kadmin.service
+}
+
+function import_realm_start_kerberos(){
+  echo "IMPORT KERBEROS DUMP"
+  sudo kdb5_util load /shared/kdc_foobar_dump -P password
+  # start the kdc and kadmin
+  echo "START KERBEROS"
+  sudo kdb5_util stash -P password
+  sudo systemctl start krb5kdc.service
+  sudo systemctl start kadmin.service
+  sudo systemctl enable krb5kdc.service
+  sudo systemctl enable kadmin.service
+  #load an empty kerberos dump #master key name 'K/M@FOOBAR.COM' password: password
+}
+
+function create_principals(){
+  awk '{ print "ank -randkey", $1 }' < /shared/princnames | sudo /usr/sbin/kadmin.local > /dev/null
+}
+
+function export_keytabs(){
+  awk '{ print "ktadd -k /shared/"$2, $1}' < /shared/princnames | sudo /usr/sbin/kadmin.local > /dev/null
+}
+
+config_hosts
+install_ntp
+install_kerberos_kdc
+#it is not fast enough create the kdc db once then provide it within the shared dir
+#increase_entropy 
+#create_realm
+#master key name 'K/M@FOOBAR.COM' password: password
+import_realm_start_kerberos
+create_principals
+export_keytabs
+
+echo "DONE"
